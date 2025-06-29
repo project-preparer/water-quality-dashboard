@@ -120,7 +120,10 @@ else:
 
 
 # Convert model output to readable label
-live_data["AI_Anomaly"] = live_data["AI_Anomaly"].map({1: "Normal", -1: "Anomaly"})
+if "AI_Anomaly" in live_data.columns:
+    live_data["AI_Anomaly"] = live_data["AI_Anomaly"].map({1: "Normal", -1: "Anomaly"})
+else:
+    live_data["AI_Anomaly"] = "Not evaluated"
 
 # Show table
 st.subheader("🔍 Sensor Readings")
