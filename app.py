@@ -7,6 +7,26 @@ import time
 
 # --- Simulate sensor data ---
 def generate_sensor_data(n=20):
+
+    # --- Twilio Alert Function ---
+from twilio.rest import Client
+
+def send_alert(message):
+    # Your Twilio credentials
+    account_sid = "TWILIO_SID"
+    auth_token = "TWILIO_AUTH"
+    twilio_number = "TWILIO_FROM"  # E.g., "+1234567890"
+
+    # Destination number (your personal number)
+    to_number = "ALERT_NUMBER"  # or "sms:+91xxxxxxxxxx"
+
+    client = Client(account_sid, auth_token)
+    client.messages.create(
+        body=message,
+        from_=twilio_number,
+        to=to_number
+    )
+
     timestamps = pd.date_range(datetime.now(), periods=n, freq="s")
     data = {
         "Timestamp": timestamps,
