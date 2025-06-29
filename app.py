@@ -120,6 +120,18 @@ if not ai_anomalies.empty:
 else:
     st.info("🧠 No anomalies detected by the AI model.")
 
+# --- Trigger Twilio Alerts ---
+
+# If any threshold breaches
+if not breaches.empty:
+    alert_msg = f"🚨 Water Quality Alert!\nThreshold breach detected:\n{breaches.iloc[-1].to_dict()}"
+    send_alert(alert_msg)
+
+# If any AI anomalies
+elif not ai_anomalies.empty:
+    alert_msg = f"🤖 AI Anomaly Detected:\nSuspicious reading:\n{ai_anomalies.iloc[-1].to_dict()}"
+    send_alert(alert_msg)
+
 # Graph selection
 st.subheader("📈 Parameter Visualization")
 param_to_plot = st.selectbox("Select parameter to plot:", list(default_thresholds.keys()))
