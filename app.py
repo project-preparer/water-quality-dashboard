@@ -151,7 +151,8 @@ else:
 
 # If any threshold breaches
 if not breaches.empty:
-    alert_msg = f"🚨 Water Quality Alert!\nThreshold breach detected:\n{breaches.iloc[-1].to_dict()}"
+    # Keep it short and useful (1–2 lines max)
+    alert_msg = f"🚨 Water Alert! {row['Timestamp']} - Issue in {', '.join(row['Sensor_Mismatch'].split(', ')[:2])}."
     send_alert(alert_msg)
 
 # If any AI anomalies
