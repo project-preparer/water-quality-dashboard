@@ -97,23 +97,27 @@ columns_to_drop = [col for col in ["Timestamp", "Threshold_Breach", "Sensor_Mism
 features = live_data.drop(columns=columns_to_drop)
 
 # Convert all values to numeric (if any strings slipped in)
+# --- Final clean and safe version of AI anomaly detection ---
+columns_to_drop = ["Timestamp", "Threshold_Breach", "Sensor_Mismatch", "AI_Anomaly"]
+features = live_data.drop(columns=[col for col in columns_to_drop if col in live_data.columns])
+
+# Force everything to numeric
 features = features.apply(pd.to_numeric, errors="coerce")
 
-# Drop rows with NaN (optional, or you can fill with 0)
+# Keep only numeric columns
+features = features.select_dtypes(include=[np.number])
+
+# Drop rows with NaNs
 features = features.dropna()
 
-# ✅ Confirm all features are numeric
-if features.empty or len(features.columns) == 0:
-    st.warning("No usable numeric data available after cleanup. Skipping anomaly detection.")
+# Fit Isolation Forest only if valid data exists
+if features.empty or features.shape[0] < 2:
+    st.warning("Insufficient or invalid data for anomaly detection.")
 else:
     from sklearn.ensemble import IsolationForest
     model = IsolationForest(contamination=0.1, random_state=42)
     live_data["AI_Anomaly"] = model.fit_predict(features)
-    
-from sklearn.ensemble import IsolationForest
-model = IsolationForest(contamination=0.1, random_state=42)
 
-live_data["AI_Anomaly"] = model.fit_predict(features)
 
 # Convert model output to readable label
 live_data["AI_Anomaly"] = live_data["AI_Anomaly"].map({1: "Normal", -1: "Anomaly"})
