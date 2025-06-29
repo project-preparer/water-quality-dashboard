@@ -14,9 +14,9 @@ from twilio.rest import Client
 
 def send_alert(message):
     account_sid = os.getenv("TWILIO_SID")
-    auth_token = os.getenv("TWILIO_AUTH")
-    twilio_number = os.getenv("TWILIO_FROM")
-    to_number = os.getenv("ALERT_NUMBER")
+    auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+    twilio_number = os.getenv("TWILIO_NUMBER")
+    to_number = os.getenv("TO_NUMBER")
 
     client = Client(account_sid, auth_token)
     client.messages.create(
