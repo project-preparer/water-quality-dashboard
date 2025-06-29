@@ -5,15 +5,14 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 import time
 import os
+import requests
 
 # --- Initialize session state ---
 if "live_data" not in st.session_state:
     st.session_state.live_data = pd.DataFrame()
 
-from twilio.rest import Client
-
+# --- Telegram Alert Function ---
 def send_telegram_alert(message):
-    import requests, os
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
@@ -25,7 +24,6 @@ def send_telegram_alert(message):
 
 # --- Simulate sensor data ---
 def generate_sensor_data(n=20):
-
     timestamps = pd.date_range(datetime.now(), periods=n, freq="s")
     data = {
         "Timestamp": timestamps,
@@ -90,35 +88,16 @@ live_data = check_thresholds(st.session_state.live_data.copy(), user_thresholds)
 # --- AI Anomaly Detection ---
 from sklearn.ensemble import IsolationForest
 
-# Prepare data for model (exclude timestamp and breach info)
-# --- Clean and prepare features for AI model ---
-columns_to_drop = [col for col in ["Timestamp", "Threshold_Breach", "Sensor_Mismatch", "AI_Anomaly"] if col in live_data.columns]
-features = live_data.drop(columns=columns_to_drop)
-
-# Convert all values to numeric (if any strings slipped in)
-# --- Final clean and safe version of AI anomaly detection ---
 columns_to_drop = ["Timestamp", "Threshold_Breach", "Sensor_Mismatch", "AI_Anomaly"]
 features = live_data.drop(columns=[col for col in columns_to_drop if col in live_data.columns])
+features = features.apply(pd.to_numeric, errors="coerce").select_dtypes(include=[np.number]).dropna()
 
-# Force everything to numeric
-features = features.apply(pd.to_numeric, errors="coerce")
-
-# Keep only numeric columns
-features = features.select_dtypes(include=[np.number])
-
-# Drop rows with NaNs
-features = features.dropna()
-
-# Fit Isolation Forest only if valid data exists
 if features.empty or features.shape[0] < 2:
     st.warning("Insufficient or invalid data for anomaly detection.")
 else:
-    from sklearn.ensemble import IsolationForest
     model = IsolationForest(contamination=0.1, random_state=42)
     live_data["AI_Anomaly"] = model.fit_predict(features)
 
-
-# Convert model output to readable label
 if "AI_Anomaly" in live_data.columns:
     live_data["AI_Anomaly"] = live_data["AI_Anomaly"].map({1: "Normal", -1: "Anomaly"})
 else:
@@ -128,7 +107,7 @@ else:
 st.subheader("🔍 Sensor Readings")
 st.dataframe(live_data)
 
-# Show warnings
+# Threshold Breach Display
 breaches = live_data[live_data["Threshold_Breach"] != "None"]
 if not breaches.empty:
     st.warning("🚨 Threshold breach detected in the following records:")
@@ -136,7 +115,7 @@ if not breaches.empty:
 else:
     st.success("✅ All parameters within safe range")
 
-# Show AI Anomalies
+# AI Anomaly Display
 st.subheader("🧠 AI Anomaly Detection")
 ai_anomalies = live_data[live_data["AI_Anomaly"] == "Anomaly"]
 if not ai_anomalies.empty:
@@ -145,29 +124,26 @@ if not ai_anomalies.empty:
 else:
     st.info("🧠 No anomalies detected by the AI model.")
 
-# --- Trigger Twilio Alerts ---
-# For each threshold breach row, send a short alert (first 2 mismatches only)
-for idx, row in breaches.iterrows():
-    alert_msg = f"🚨 Water Alert! {live_data.iloc[-1]['Timestamp']} - Issue in {', '.join(row['Threshold_Breach'].split(', ')[:2])}."
+# --- Telegram Alerts ---
+if not breaches.empty:
+    last = live_data.iloc[-1]
+    alert_msg = f"🚨 Water Alert! {last['Timestamp']} - Issue in {', '.join(last['Threshold_Breach'].split(', ')[:2])}."
     send_telegram_alert(alert_msg)
 
-# For AI anomaly alert (only the most recent)
 if not ai_anomalies.empty:
     last = ai_anomalies.iloc[-1]
-    alert_msg = f"🤖 AI Anomaly at {last['Timestamp']} - in {', '.join([k for k, v in last.items() if v == 'Anomaly'])[:50]}"
+    alert_msg = f"🤖 AI Anomaly at {last['Timestamp']} - Full data: {last.to_dict()}"
     send_telegram_alert(alert_msg)
 
-# Graph selection
+# --- Graph section ---
 st.subheader("📈 Parameter Visualization")
-# List only parameters that actually exist in the data and avoid redundant (_2) columns
 plot_columns = [col for col in default_thresholds.keys() if col in live_data.columns]
 param_to_plot = st.selectbox("Select parameter to plot:", plot_columns)
-# Plotting
+
 def plot_parameter(df, param):
     if "Timestamp" not in df.columns or param not in df.columns:
         st.warning(f"Cannot plot '{param}'. Column missing in data.")
         return
-    
     fig, ax = plt.subplots()
     ax.plot(df["Timestamp"], df[param], marker='o', label=param)
     ax.set_xlabel("Time")
@@ -176,10 +152,9 @@ def plot_parameter(df, param):
     ax.legend()
     st.pyplot(fig)
 
-
 plot_parameter(live_data, param_to_plot)
 
-# Export button
+# --- Export to CSV ---
 if st.button("📤 Export to CSV"):
     filename = f"water_quality_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
     live_data.to_csv(filename, index=False)
