@@ -507,8 +507,20 @@ with tab1:
         else:
             return ['background-color: #f5c6cb; color: black'] * len(row)
     
+    # Display options for data range
+    col1, col2 = st.columns(2)
+    with col1:
+        show_all = st.checkbox("Show all data points", value=False)
+    with col2:
+        if not show_all:
+            num_rows = st.slider("Number of recent rows to show", 10, 100, 20)
+    
     # Display formatted data with additional warning indicators
-    display_data = current_data.tail(20).copy()
+    if show_all:
+        display_data = current_data.copy()
+    else:
+        display_data = current_data.tail(num_rows).copy()
+    
     display_data['Timestamp'] = display_data['Timestamp'].dt.strftime('%H:%M:%S')
     
     # Add warning symbols to breach/anomaly rows
@@ -612,26 +624,158 @@ with tab4:
                  color_continuous_scale='RdYlGn')
     st.plotly_chart(fig, use_container_width=True)
 
-# --- Export and Reports ---
+# --- File Upload Section ---
 st.markdown("---")
-st.markdown("## 📤 Export & Reports")
+st.markdown("## 📁 Data Management")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.subheader("📤 Export Data")
+    
+    # Export current data
+    if st.button("📊 Export Current Data as CSV", type="primary"):
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        csv_data = current_data.to_csv(index=False)
+        st.download_button(
+            label="⬇️ Download CSV File",
+            data=csv_data,
+            file_name=f"water_quality_data_{timestamp}.csv",
+            mime="text/csv"
+        )
+        st.success("✅ CSV file ready for download!")
+
+with col2:
+    st.subheader("📥 Import Data")
+    
+    # File upload
+    uploaded_file = st.file_uploader(
+        "Upload CSV file with sensor data",
+        type=['csv'],
+        help="Upload a CSV file with water quality sensor readings. Should contain columns like pH, Temperature, TDS, etc."
+    )
+    
+    if uploaded_file is not None:
+        try:
+            # Read the uploaded CSV
+            uploaded_data = pd.read_csv(uploaded_file)
+            
+            # Show preview
+            st.info(f"📊 File uploaded successfully! Contains {len(uploaded_data)} rows and {len(uploaded_data.columns)} columns.")
+            
+            # Show column mapping interface
+            st.subheader("🔗 Column Mapping")
+            st.write("Map your CSV columns to standard parameters:")
+            
+            # Create mapping dictionary
+            column_mapping = {}
+            available_columns = list(uploaded_data.columns)
+            standard_params = list(WHO_STANDARDS.keys()) + ['Timestamp']
+            
+            # Create mapping interface
+            mapping_cols = st.columns(3)
+            for i, param in enumerate(standard_params):
+                with mapping_cols[i % 3]:
+                    if param.lower() in [col.lower() for col in available_columns]:
+                        # Auto-detect similar column names
+                        default_idx = next((j for j, col in enumerate(['Select...'] + available_columns) 
+                                          if col.lower() == param.lower()), 0)
+                    else:
+                        default_idx = 0
+                    
+                    selected_col = st.selectbox(
+                        f"{param}:",
+                        options=['Select...'] + available_columns,
+                        index=default_idx,
+                        key=f"mapping_{param}"
+                    )
+                    
+                    if selected_col != 'Select...':
+                        column_mapping[param] = selected_col
+            
+            # Process and use uploaded data
+            if st.button("✅ Use Uploaded Data", type="primary"):
+                try:
+                    # Rename columns according to mapping
+                    processed_data = uploaded_data.copy()
+                    reverse_mapping = {v: k for k, v in column_mapping.items()}
+                    processed_data = processed_data.rename(columns=reverse_mapping)
+                    
+                    # Convert timestamp if present
+                    if 'Timestamp' in processed_data.columns:
+                        processed_data['Timestamp'] = pd.to_datetime(processed_data['Timestamp'], errors='coerce')
+                    else:
+                        # Create timestamps if not present
+                        processed_data['Timestamp'] = pd.date_range(
+                            start=datetime.now() - timedelta(seconds=len(processed_data)*10),
+                            periods=len(processed_data),
+                            freq='10S'
+                        )
+                    
+                    # Store in session state
+                    st.session_state.live_data = processed_data
+                    st.success(f"✅ Successfully loaded {len(processed_data)} records from uploaded file!")
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"❌ Error processing uploaded data: {str(e)}")
+            
+            # Show preview of uploaded data
+            st.subheader("👀 Data Preview")
+            st.dataframe(uploaded_data.head(10), use_container_width=True)
+            
+        except Exception as e:
+            st.error(f"❌ Error reading CSV file: {str(e)}")
+            st.info("💡 Make sure your CSV file has proper headers and is correctly formatted.")
+
+# --- Additional Export Options ---
+st.markdown("### 📋 Additional Export Options")
 
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    if st.button("📊 Generate Report", type="primary"):
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"water_quality_report_{timestamp}.csv"
-        current_data.to_csv(filename, index=False)
-        st.success(f"✅ Report saved as {filename}")
+    # Export only breaches
+    if not breaches.empty:
+        breach_csv = breaches.to_csv(index=False)
+        st.download_button(
+            label="🚨 Export Breaches Only",
+            data=breach_csv,
+            file_name=f"water_quality_breaches_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv"
+        )
 
 with col2:
-    if st.button("📧 Email Report"):
-        st.info("📧 Email functionality would be implemented here")
+    # Export only anomalies
+    if not anomalies.empty:
+        anomaly_csv = anomalies.to_csv(index=False)
+        st.download_button(
+            label="🤖 Export Anomalies Only",
+            data=anomaly_csv,
+            file_name=f"water_quality_anomalies_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv"
+        )
 
 with col3:
-    if st.button("📱 Send SMS Alert"):
-        st.info("📱 SMS alert functionality would be implemented here")
+    # Export summary report
+    summary_data = {
+        'Parameter': list(WHO_STANDARDS.keys()),
+        'Current_Value': [current_data[param].iloc[-1] if param in current_data.columns else 'N/A' 
+                         for param in WHO_STANDARDS.keys()],
+        'Min_Standard': [WHO_STANDARDS[param]['min'] for param in WHO_STANDARDS.keys()],
+        'Max_Standard': [WHO_STANDARDS[param]['max'] for param in WHO_STANDARDS.keys()],
+        'Status': ['Within Range' if param in current_data.columns and 
+                  WHO_STANDARDS[param]['min'] <= current_data[param].iloc[-1] <= WHO_STANDARDS[param]['max']
+                  else 'Out of Range' for param in WHO_STANDARDS.keys()]
+    }
+    summary_df = pd.DataFrame(summary_data)
+    summary_csv = summary_df.to_csv(index=False)
+    
+    st.download_button(
+        label="📋 Export Summary Report",
+        data=summary_csv,
+        file_name=f"water_quality_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+        mime="text/csv"
+    )
 
 # --- Footer ---
 st.markdown("---")
