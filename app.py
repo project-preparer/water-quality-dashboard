@@ -16,7 +16,12 @@ def send_telegram_alert(message):
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    payload = {"chat_id": chat_id, "text": message}
+    payload = {
+        "chat_id": chat_id,
+        "text": message,
+        "parse_mode": "Markdown"
+    }
+
     try:
         requests.post(url, data=payload)
     except Exception as e:
@@ -127,12 +132,39 @@ else:
 # --- Telegram Alerts ---
 if not breaches.empty:
     last = live_data.iloc[-1]
-    alert_msg = f"🚨 Water Alert! {last['Timestamp']} - Issue in {', '.join(last['Threshold_Breach'].split(', ')[:2])}."
+    breached = last['Threshold_Breach'].split(', ')[:2]
+    alert_msg = (
+        f"🚨 *Threshold Breach Alert!*\n\n"
+        f"📅 Timestamp: {last['Timestamp']}\n"
+        f"⚠️ Breached Parameters: {', '.join(breached)}\n"
+        f"📊 Readings:\n"
+        f"- pH: {last['pH']}\n"
+        f"- Turbidity: {last['Turbidity']}\n"
+        f"- TDS: {last['TDS']} ppm\n"
+        f"- Temperature: {last['Temperature']} °C\n"
+        f"- Nitrate: {last['Nitrate']} mg/L\n"
+        f"- Chloride: {last['Chloride']} mg/L\n"
+        f"- Fluoride: {last['Fluoride']} mg/L\n"
+        f"- Hardness: {last['Hardness']} mg/L"
+    )
     send_telegram_alert(alert_msg)
+
 
 if not ai_anomalies.empty:
     last = ai_anomalies.iloc[-1]
-    alert_msg = f"🤖 AI Anomaly at {last['Timestamp']} - Full data: {last.to_dict()}"
+    alert_msg = (
+        f"🤖 *AI Anomaly Detected!*\n\n"
+        f"📅 Timestamp: {last['Timestamp']}\n"
+        f"📊 Parameters:\n"
+        f"- pH: {last['pH']}\n"
+        f"- Turbidity: {last['Turbidity']}\n"
+        f"- TDS: {last['TDS']} ppm\n"
+        f"- Temperature: {last['Temperature']} °C\n"
+        f"- Nitrate: {last['Nitrate']} mg/L\n"
+        f"- Chloride: {last['Chloride']} mg/L\n"
+        f"- Fluoride: {last['Fluoride']} mg/L\n"
+        f"- Hardness: {last['Hardness']} mg/L"
+    )
     send_telegram_alert(alert_msg)
 
 # --- Graph section ---
