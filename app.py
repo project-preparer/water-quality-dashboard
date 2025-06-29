@@ -68,6 +68,17 @@ if "live_data" not in st.session_state:
 # Check thresholds
 live_data = check_thresholds(st.session_state.live_data.copy(), user_thresholds)
 
+# --- AI Anomaly Detection ---
+from sklearn.ensemble import IsolationForest
+
+# Prepare data for model (exclude timestamp and breach info)
+features = live_data.drop(columns=["Timestamp", "Threshold_Breach"])
+model = IsolationForest(contamination=0.1, random_state=42)
+live_data["AI_Anomaly"] = model.fit_predict(features)
+
+# Convert model output to readable label
+live_data["AI_Anomaly"] = live_data["AI_Anomaly"].map({1: "Normal", -1: "Anomaly"})
+
 # Show table
 st.subheader("🔍 Sensor Readings")
 st.dataframe(live_data)
@@ -79,6 +90,15 @@ if not breaches.empty:
     st.dataframe(breaches)
 else:
     st.success("✅ All parameters within safe range")
+
+# Show AI Anomalies
+st.subheader("🧠 AI Anomaly Detection")
+ai_anomalies = live_data[live_data["AI_Anomaly"] == "Anomaly"]
+if not ai_anomalies.empty:
+    st.error("🤖 AI detected anomalies in the following records:")
+    st.dataframe(ai_anomalies)
+else:
+    st.info("🧠 No anomalies detected by the AI model.")
 
 # Graph selection
 st.subheader("📈 Parameter Visualization")
