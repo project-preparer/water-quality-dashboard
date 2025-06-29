@@ -140,28 +140,75 @@ def generate_sensor_data(n=50, add_anomaly=False):
     timestamps = [base_time - timedelta(seconds=i*10) for i in range(n)]
     timestamps.reverse()
     
-    # Generate realistic water quality data
+    # Generate realistic water quality data with some natural variation
     data = {
         "Timestamp": timestamps,
-        "pH": np.round(np.random.normal(7.2, 0.3, n), 2),
-        "Turbidity": np.round(np.random.lognormal(0.5, 0.3, n), 2),
-        "TDS": np.round(np.random.normal(300, 50, n), 2),
-        "Temperature": np.round(np.random.normal(25, 3, n), 2),
-        "Nitrate": np.round(np.random.lognormal(2, 0.5, n), 2),
-        "Chloride": np.round(np.random.normal(150, 30, n), 2),
-        "Fluoride": np.round(np.random.normal(0.8, 0.2, n), 2),
-        "Hardness": np.round(np.random.normal(200, 40, n), 2),
-        "DO": np.round(np.random.normal(8, 1, n), 2),
-        "BOD": np.round(np.random.lognormal(2, 0.4, n), 2),
+        "pH": np.round(np.random.normal(7.2, 0.5, n), 2),  # Increased variation
+        "Turbidity": np.round(np.random.lognormal(0.8, 0.6, n), 2),  # More variation
+        "TDS": np.round(np.random.normal(350, 80, n), 2),  # Increased variation
+        "Temperature": np.round(np.random.normal(25, 4, n), 2),  # More variation
+        "Nitrate": np.round(np.random.lognormal(2.5, 0.8, n), 2),  # More variation
+        "Chloride": np.round(np.random.normal(180, 50, n), 2),  # Increased variation
+        "Fluoride": np.round(np.random.normal(1.0, 0.4, n), 2),  # More variation
+        "Hardness": np.round(np.random.normal(220, 60, n), 2),  # Increased variation
+        "DO": np.round(np.random.normal(7, 2, n), 2),  # More variation
+        "BOD": np.round(np.random.lognormal(2.5, 0.6, n), 2),  # More variation
     }
     
-    # Add some anomalies if requested
+    # Ensure some values are outside normal ranges for realistic breaches
+    for i in range(n):
+        if np.random.random() < 0.15:  # 15% chance of parameter being out of range
+            param = np.random.choice(list(data.keys())[1:])  # Skip timestamp
+            if param == "pH":
+                data[param][i] = np.random.choice([np.random.uniform(4, 6), np.random.uniform(9, 10)])
+            elif param == "Turbidity":
+                data[param][i] = np.random.uniform(6, 12)
+            elif param == "TDS":
+                data[param][i] = np.random.uniform(550, 700)
+            elif param == "Temperature":
+                data[param][i] = np.random.choice([np.random.uniform(2, 4), np.random.uniform(35, 40)])
+            elif param == "Nitrate":
+                data[param][i] = np.random.uniform(50, 80)
+            elif param == "Chloride":
+                data[param][i] = np.random.uniform(280, 400)
+            elif param == "Fluoride":
+                data[param][i] = np.random.uniform(2, 3)
+            elif param == "Hardness":
+                data[param][i] = np.random.uniform(350, 500)
+            elif param == "DO":
+                data[param][i] = np.random.uniform(1, 3)
+            elif param == "BOD":
+                data[param][i] = np.random.uniform(35, 60)
+    
+    # Add more severe anomalies if requested
     if add_anomaly:
-        anomaly_indices = np.random.choice(n, size=max(1, n//10), replace=False)
+        anomaly_indices = np.random.choice(n, size=max(3, n//8), replace=False)
         for idx in anomaly_indices:
-            data["pH"][idx] = np.random.choice([4.5, 9.5])
-            data["Turbidity"][idx] = np.random.uniform(8, 15)
-            data["TDS"][idx] = np.random.uniform(600, 800)
+            # Create multiple parameter anomalies
+            num_params = np.random.randint(2, 4)
+            params_to_anomalize = np.random.choice(list(data.keys())[1:], num_params, replace=False)
+            
+            for param in params_to_anomalize:
+                if param == "pH":
+                    data[param][idx] = np.random.choice([3.5, 10.5])
+                elif param == "Turbidity":
+                    data[param][idx] = np.random.uniform(15, 25)
+                elif param == "TDS":
+                    data[param][idx] = np.random.uniform(800, 1000)
+                elif param == "Temperature":
+                    data[param][idx] = np.random.choice([1, 45])
+                elif param == "Nitrate":
+                    data[param][idx] = np.random.uniform(80, 120)
+                elif param == "Chloride":
+                    data[param][idx] = np.random.uniform(400, 600)
+                elif param == "Fluoride":
+                    data[param][idx] = np.random.uniform(3, 5)
+                elif param == "Hardness":
+                    data[param][idx] = np.random.uniform(500, 800)
+                elif param == "DO":
+                    data[param][idx] = np.random.uniform(0.5, 2)
+                elif param == "BOD":
+                    data[param][idx] = np.random.uniform(60, 100)
     
     return pd.DataFrame(data)
 
@@ -443,9 +490,15 @@ tab1, tab2, tab3, tab4 = st.tabs(["📊 Current Readings", "🚨 Alerts", "🧠 
 with tab1:
     st.subheader("Latest Sensor Readings")
     
-    # Color-code the dataframe based on quality
+    # Color-code the dataframe based on quality and breaches
     def highlight_quality(row):
-        if row['Quality_Category'] == 'Excellent':
+        # Check for breaches and anomalies
+        has_breach = row.get('Breach_Count', 0) > 0
+        has_anomaly = row.get('AI_Anomaly', 'Normal') == 'Anomaly'
+        
+        if has_breach or has_anomaly:
+            return ['background-color: #ffcccc; color: black; font-weight: bold'] * len(row)  # Light red for issues
+        elif row['Quality_Category'] == 'Excellent':
             return ['background-color: #d4edda; color: black'] * len(row)
         elif row['Quality_Category'] == 'Good':
             return ['background-color: #fff3cd; color: black'] * len(row)
@@ -454,9 +507,15 @@ with tab1:
         else:
             return ['background-color: #f5c6cb; color: black'] * len(row)
     
-    # Display formatted data
+    # Display formatted data with additional warning indicators
     display_data = current_data.tail(20).copy()
     display_data['Timestamp'] = display_data['Timestamp'].dt.strftime('%H:%M:%S')
+    
+    # Add warning symbols to breach/anomaly rows
+    display_data['Status'] = display_data.apply(lambda row: 
+        '🚨 BREACH' if row.get('Breach_Count', 0) > 0 
+        else '🤖 ANOMALY' if row.get('AI_Anomaly', 'Normal') == 'Anomaly'
+        else '✅ NORMAL', axis=1)
     
     st.dataframe(
         display_data.style.apply(highlight_quality, axis=1),
