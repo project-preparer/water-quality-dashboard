@@ -148,16 +148,15 @@ else:
     st.info("🧠 No anomalies detected by the AI model.")
 
 # --- Trigger Twilio Alerts ---
-
-# If any threshold breaches
-if not breaches.empty:
-    # Keep it short and useful (1–2 lines max)
-    alert_msg = f"🚨 Water Alert! {row['Timestamp']} - Issue in {', '.join(row['Sensor_Mismatch'].split(', ')[:2])}."
+# For each threshold breach row, send a short alert (first 2 mismatches only)
+for idx, row in breaches.iterrows():
+    alert_msg = f"🚨 Water Alert! {row['Timestamp']} - Issue in {', '.join(row['Threshold_Breach'].split(', ')[:2])}."
     send_alert(alert_msg)
 
-# If any AI anomalies
-elif not ai_anomalies.empty:
-    alert_msg = f"🤖 AI Anomaly Detected:\nSuspicious reading:\n{ai_anomalies.iloc[-1].to_dict()}"
+# For AI anomaly alert (only the most recent)
+if not ai_anomalies.empty:
+    last = ai_anomalies.iloc[-1]
+    alert_msg = f"🤖 AI Anomaly at {last['Timestamp']} - in {', '.join([k for k, v in last.items() if v == 'Anomaly'])[:50]}"
     send_alert(alert_msg)
 
 # Graph selection
