@@ -92,9 +92,16 @@ live_data = check_thresholds(st.session_state.live_data.copy(), user_thresholds)
 from sklearn.ensemble import IsolationForest
 
 # Prepare data for model (exclude timestamp and breach info)
-columns_to_drop = [col for col in ["Timestamp", "Threshold_Breach"] if col in live_data.columns]
+# --- Clean and prepare features for AI model ---
+columns_to_drop = [col for col in ["Timestamp", "Threshold_Breach", "Sensor_Mismatch", "AI_Anomaly"] if col in live_data.columns]
 features = live_data.drop(columns=columns_to_drop)
-model = IsolationForest(contamination=0.1, random_state=42)
+
+# Convert all values to numeric (if any strings slipped in)
+features = features.apply(pd.to_numeric, errors="coerce")
+
+# Drop rows with NaN (optional, or you can fill with 0)
+features = features.dropna()
+
 live_data["AI_Anomaly"] = model.fit_predict(features)
 
 # Convert model output to readable label
