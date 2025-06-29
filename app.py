@@ -103,8 +103,8 @@ features = features.apply(pd.to_numeric, errors="coerce")
 features = features.dropna()
 
 # ✅ Confirm all features are numeric
-if not np.issubdtype(features.dtypes.values[0], np.number):
-    st.error("Data type issue detected. Features are not numeric.")
+if features.empty or len(features.columns) == 0:
+    st.warning("No usable numeric data available after cleanup. Skipping anomaly detection.")
 else:
     from sklearn.ensemble import IsolationForest
     model = IsolationForest(contamination=0.1, random_state=42)
