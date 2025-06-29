@@ -12,18 +12,16 @@ if "live_data" not in st.session_state:
 
 from twilio.rest import Client
 
-def send_alert(message):
-    account_sid = os.getenv("TWILIO_SID")
-    auth_token = os.getenv("TWILIO_AUTH_TOKEN")
-    twilio_number = os.getenv("TWILIO_NUMBER")
-    to_number = os.getenv("TO_NUMBER")
-
-    client = Client(account_sid, auth_token)
-    client.messages.create(
-        body=message,
-        from_=twilio_number,
-        to=to_number
-    )
+def send_telegram_alert(message):
+    import requests, os
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {"chat_id": chat_id, "text": message}
+    try:
+        requests.post(url, data=payload)
+    except Exception as e:
+        st.error(f"Telegram alert failed: {e}")
 
 # --- Simulate sensor data ---
 def generate_sensor_data(n=20):
@@ -150,14 +148,14 @@ else:
 # --- Trigger Twilio Alerts ---
 # For each threshold breach row, send a short alert (first 2 mismatches only)
 for idx, row in breaches.iterrows():
-    alert_msg = f"🚨 Water Alert! {row['Timestamp']} - Issue in {', '.join(row['Threshold_Breach'].split(', ')[:2])}."
-    send_alert(alert_msg)
+    alert_msg = f"🚨 Water Alert! {live_data.iloc[-1]['Timestamp']} - Issue in {', '.join(row['Threshold_Breach'].split(', ')[:2])}."
+    send_telegram_alert(alert_msg)
 
 # For AI anomaly alert (only the most recent)
 if not ai_anomalies.empty:
     last = ai_anomalies.iloc[-1]
     alert_msg = f"🤖 AI Anomaly at {last['Timestamp']} - in {', '.join([k for k, v in last.items() if v == 'Anomaly'])[:50]}"
-    send_alert(alert_msg)
+    send_telegram_alert(alert_msg)
 
 # Graph selection
 st.subheader("📈 Parameter Visualization")
