@@ -160,20 +160,23 @@ elif not ai_anomalies.empty:
 
 # Graph selection
 st.subheader("📈 Parameter Visualization")
-param_to_plot = st.selectbox("Select parameter to plot:", list(default_thresholds.keys()))
-
+# List only parameters that actually exist in the data and avoid redundant (_2) columns
+plot_columns = [col for col in default_thresholds.keys() if col in live_data.columns]
+param_to_plot = st.selectbox("Select parameter to plot:", plot_columns)
 # Plotting
 def plot_parameter(df, param):
+    if "Timestamp" not in df.columns or param not in df.columns:
+        st.warning(f"Cannot plot '{param}'. Column missing in data.")
+        return
+    
     fig, ax = plt.subplots()
     ax.plot(df["Timestamp"], df[param], marker='o', label=param)
-    ax.axhline(user_thresholds[param][0], color='red', linestyle='--', label="Min Threshold")
-    ax.axhline(user_thresholds[param][1], color='red', linestyle='--', label="Max Threshold")
     ax.set_xlabel("Time")
     ax.set_ylabel(param)
-    ax.set_title(f"{param} Over Time")
+    ax.set_title(f"Live Plot of {param}")
     ax.legend()
-    plt.xticks(rotation=45)
     st.pyplot(fig)
+
 
 plot_parameter(live_data, param_to_plot)
 
