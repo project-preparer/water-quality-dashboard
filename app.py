@@ -102,6 +102,14 @@ features = features.apply(pd.to_numeric, errors="coerce")
 # Drop rows with NaN (optional, or you can fill with 0)
 features = features.dropna()
 
+# ✅ Confirm all features are numeric
+if not np.issubdtype(features.dtypes.values[0], np.number):
+    st.error("Data type issue detected. Features are not numeric.")
+else:
+    from sklearn.ensemble import IsolationForest
+    model = IsolationForest(contamination=0.1, random_state=42)
+    live_data["AI_Anomaly"] = model.fit_predict(features)
+    
 from sklearn.ensemble import IsolationForest
 model = IsolationForest(contamination=0.1, random_state=42)
 
