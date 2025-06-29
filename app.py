@@ -9,7 +9,7 @@ import time
 def generate_sensor_data(n=20):
 
     # --- Twilio Alert Function ---
-from twilio.rest import Client
+    from twilio.rest import Client
 
 def send_alert(message):
     # Your Twilio credentials
