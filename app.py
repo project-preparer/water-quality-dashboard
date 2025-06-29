@@ -5,20 +5,17 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 import time
 
-# --- Simulate sensor data ---
-def generate_sensor_data(n=20):
+# --- Initialize session state ---
+if "live_data" not in st.session_state:
+    st.session_state.live_data = pd.DataFrame()
 
-    # --- Twilio Alert Function ---
-    from twilio.rest import Client
+from twilio.rest import Client
 
 def send_alert(message):
-    # Your Twilio credentials
-    account_sid = "TWILIO_SID"
-    auth_token = "TWILIO_AUTH"
-    twilio_number = "TWILIO_FROM"  # E.g., "+1234567890"
-
-    # Destination number (your personal number)
-    to_number = "ALERT_NUMBER"  # or "sms:+91xxxxxxxxxx"
+    account_sid = os.getenv("TWILIO_SID")
+    auth_token = os.getenv("TWILIO_AUTH")
+    twilio_number = os.getenv("TWILIO_FROM")
+    to_number = os.getenv("ALERT_NUMBER")
 
     client = Client(account_sid, auth_token)
     client.messages.create(
@@ -26,6 +23,9 @@ def send_alert(message):
         from_=twilio_number,
         to=to_number
     )
+
+# --- Simulate sensor data ---
+def generate_sensor_data(n=20):
 
     timestamps = pd.date_range(datetime.now(), periods=n, freq="s")
     data = {
